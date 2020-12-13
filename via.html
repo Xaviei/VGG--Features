@@ -1117,6 +1117,7 @@ var _via_img_src      = {};   // image content {abs. path, url, base64 data, etc
 var _via_img_fileref  = {};   // reference to local images selected by using browser file selector
 var _via_img_count    = 0;    // count of the loaded images
 var _via_canvas_regions = []; // image regions spec. in canvas space
+var _via_canvas_combined_regions = [];
 var _via_canvas_scale   = 1.0;// current scale of canvas image
 
 var _via_image_id       = ''; // id={filename+length} of current image
@@ -2639,6 +2640,36 @@ function toggle_all_regions_selection(is_selected) {
   }
 }
 
+function count_selected_regions() {
+  var n = _via_img_metadata[_via_image_id].regions.length;
+
+  let count = 0;
+  for (let i = 0; i < n; ++i) {
+    if (_via_region_selected_flag[i]) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function get_selected_regions() {
+  var n = _via_img_metadata[_via_image_id].regions.length;
+
+  let selectedRegions = [];
+  for (let i = 0; i < n; ++i) {
+    if (_via_region_selected_flag[i]) {
+      selectedRegions.push(_via_img_metadata[_via_image_id].regions[i]);
+    }
+  }
+
+  return selectedRegions;
+}
+
+function is_combined_region(region) {
+  return Array.from(_via_canvas_combined_regions).filter(regions => regions.includes(region)).length > 0;
+}
+
 function select_only_region(region_id) {
   toggle_all_regions_selection(false);
   set_region_select_state(region_id, true);
@@ -3724,9 +3755,10 @@ function _via_redraw_reg_canvas() {
     if ( _via_canvas_regions.length > 0 ) {
       if (_via_is_region_boundary_visible) {
         draw_all_regions();
+        draw_all_combined_regions();
       }
       if (_via_is_region_id_visible) {
-        draw_all_region_id();
+        //draw_all_region_id();
       }
     }
   }
@@ -3736,12 +3768,77 @@ function _via_clear_reg_canvas() {
   _via_reg_ctx.clearRect(0, 0, _via_reg_canvas.width, _via_reg_canvas.height);
 }
 
+function draw_all_combined_regions() {
+  Array.from(_via_canvas_combined_regions).forEach(row => {
+    _via_reg_ctx.globalCompositeOperation='destination-out';
+    Array.from(row).forEach(shape => {
+      var attr, is_selected, aid, avalue;
+      attr = shape.shape_attributes;
+      var aid = _via_settings.ui.image.region_color;
+
+      // region stroke style may depend on attribute value
+      _via_reg_ctx.strokeStyle = VIA_THEME_BOUNDARY_FILL_COLOR;
+      if ( ! _via_is_user_drawing_polygon &&
+          aid !== '__via_default_region_color__' ) {
+        avalue = _via_img_metadata[_via_image_id].regions[i].region_attributes[aid];
+        if ( _via_canvas_regions_group_color.hasOwnProperty(avalue) ) {
+          _via_reg_ctx.strokeStyle = _via_canvas_regions_group_color[avalue];
+        }
+      }
+
+      switch( attr['name'] ) {
+        case VIA_REGION_SHAPE.RECT:
+          _via_draw_rect_region(attr['x'],
+                                attr['y'],
+                                attr['width'],
+                                attr['height'],
+                                is_selected);
+          break;
+
+        case VIA_REGION_SHAPE.CIRCLE:
+          _via_draw_circle_region(attr['cx'],
+                                  attr['cy'],
+                                  attr['r'],
+                                  is_selected);
+          break;
+
+        case VIA_REGION_SHAPE.ELLIPSE:
+          if (typeof(attr['theta']) === 'undefined') { attr['theta'] = 0; }
+          _via_draw_ellipse_region(attr['cx'],
+                                  attr['cy'],
+                                  attr['rx'],
+                                  attr['ry'],
+                                  attr['theta'],
+                                  is_selected);
+          break;
+
+        case VIA_REGION_SHAPE.POLYLINE: // handled by polygon
+        case VIA_REGION_SHAPE.POLYGON:
+          _via_draw_polygon_region(attr['all_points_x'],
+                                  attr['all_points_y'],
+                                  is_selected,
+                                  attr['name']);
+          break;
+
+        case VIA_REGION_SHAPE.POINT:
+          _via_draw_point_region(attr['cx'],
+                                attr['cy'],
+                                is_selected);
+          break;
+        }
+    });
+    _via_reg_ctx.globalCompositeOperation='source-over';
+  });
+}
+
 function draw_all_regions() {
   var aid = _via_settings.ui.image.region_color;
   var attr, is_selected, aid, avalue;
   for (var i=0; i < _via_canvas_regions.length; ++i) {
     attr = _via_canvas_regions[i].shape_attributes;
     is_selected = _via_region_selected_flag[i];
+
+    if (is_combined_region(_via_canvas_regions[i])) return;
 
     // region stroke style may depend on attribute value
     _via_reg_ctx.strokeStyle = VIA_THEME_BOUNDARY_FILL_COLOR;
@@ -3752,7 +3849,7 @@ function draw_all_regions() {
         _via_reg_ctx.strokeStyle = _via_canvas_regions_group_color[avalue];
       }
     }
-
+    
     switch( attr['name'] ) {
     case VIA_REGION_SHAPE.RECT:
       _via_draw_rect_region(attr['x'],
@@ -4800,6 +4897,14 @@ function _via_handle_global_keydown_event(e) {
       // select all in image grid
       image_grid_group_toggle_select_all();
     }
+  }
+
+  if (e.key === 'z' && count_selected_regions() > 1) {
+    console.log({selectedRegions: get_selected_regions()})
+    _via_canvas_combined_regions.push(get_selected_regions());
+    _via_redraw_reg_canvas();
+
+    console.log("Multiple regions selected & z pressed");
   }
 
   if ( e.key === 'Escape' ) {
