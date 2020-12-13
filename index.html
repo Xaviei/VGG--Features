@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body onload="init()" style="position: relative;">
+    <img src="vr.jpeg" style="position: absolute; z-index: -1; width: 500px; height:"></img>
+    <canvas id="myCanvas" width="500" height="500" style="border:1px solid #000000;">
+    </canvas>    
+</body>
+<script>
+    function init() {
+        console.log("Load");
+        let canvas = document.getElementById("myCanvas");
+        var ctx=canvas.getContext("2d");
+        var cw=canvas.width;
+        var ch=canvas.height;
+
+        var r=50;
+
+
+        // draw the blue background
+        // The background will be visible only outside the double-circles
+        ctx.fillStyle='rgb(0,174,239)';
+        ctx.fillRect(0,0,cw,ch);
+
+
+        ctx.fillStyle='yellow'
+        ctx.beginPath();
+        ctx.arc(cw/2-r/2,ch/2,r+5,0,Math.PI*2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cw/2+r/2,ch/2,r+5,0,Math.PI*2);
+        ctx.closePath();
+        ctx.fill();
+
+        // use destination-out compositing to "knockout" 
+        // the double-circles and thereby revealing the
+        // ivory webpage background below
+        ctx.globalCompositeOperation='destination-out';
+
+        // draw the double-circles
+        // and effectively "erase" the blue background
+        ctx.fillStyle='white'
+        ctx.beginPath();
+        ctx.arc(cw/2-r/2,ch/2,r,0,Math.PI*2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cw/2+r/2,ch/2,r,0,Math.PI*2);
+        ctx.closePath();
+        ctx.fill();
+
+        // always clean up! Set compositing back to its default
+        ctx.globalCompositeOperation='source-over';
+    }
+</script>
+</html>
+
+
+
